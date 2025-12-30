@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rusty PDF Demo</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #0f172a;
+            min-height: 100vh;
+            color: #fff;
+        }
+        
+        .container { max-width: 900px; margin: 0 auto; padding: 24px 20px; }
+        
+        .header { text-align: center; margin-bottom: 20px; }
+        .header h1 { font-size: 1.6rem; font-weight: 600; color: #f1f5f9; }
+        .header h1 span { margin-right: 8px; }
+        .header p { color: #64748b; font-size: 0.85rem; margin-top: 4px; }
+        
+        .controls { background: #1e293b; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+        
+        .upload-area {
+            border: 2px dashed #334155; border-radius: 8px; padding: 20px;
+            text-align: center; cursor: pointer; transition: all 0.2s;
+        }
+        .upload-area:hover { border-color: #6366f1; background: rgba(99,102,241,0.05); }
+        .upload-area .icon { font-size: 1.5rem; margin-bottom: 6px; }
+        .upload-area .text { color: #94a3b8; font-size: 0.85rem; }
+        .file-input { display: none; }
+        
+        .divider {
+            display: flex; align-items: center; gap: 10px; margin: 12px 0;
+            color: #475569; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em;
+        }
+        .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: #334155; }
+        
+        .url-row { display: flex; gap: 8px; }
+        .url-input {
+            flex: 1; padding: 8px 12px; border: 1px solid #334155; border-radius: 6px;
+            background: #0f172a; color: #fff; font-size: 0.85rem; font-family: inherit;
+        }
+        .url-input:focus { outline: none; border-color: #6366f1; }
+        .url-input::placeholder { color: #475569; }
+        
+        .btn {
+            padding: 8px 16px; background: #6366f1; border: none; border-radius: 6px;
+            color: #fff; font-size: 0.85rem; font-weight: 500; font-family: inherit; cursor: pointer;
+        }
+        .btn:hover { background: #4f46e5; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        .options-row { display: flex; justify-content: center; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+        .option-label { display: flex; align-items: center; gap: 6px; color: #94a3b8; font-size: 0.8rem; cursor: pointer; }
+        .option-label input { accent-color: #6366f1; }
+        
+        .reader { background: #1e293b; border-radius: 8px; overflow: hidden; }
+        
+        .reader-toolbar {
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+            padding: 8px 12px; background: #1e293b; border-bottom: 1px solid #334155; flex-wrap: wrap;
+        }
+        .reader-toolbar button {
+            padding: 5px 10px; border: none; border-radius: 4px;
+            background: transparent; color: #94a3b8; font-size: 13px; cursor: pointer;
+        }
+        .reader-toolbar button:hover:not(:disabled) { background: #334155; color: #f1f5f9; }
+        .reader-toolbar button:disabled { opacity: 0.4; cursor: not-allowed; }
+        .reader-toolbar span { color: #64748b; font-size: 13px; }
+        
+        /* Search with dropdown */
+        .search-wrapper { position: relative; }
+        .search-box {
+            display: flex; align-items: center; gap: 4px;
+            background: #0f172a; border: 1px solid #334155; border-radius: 4px; padding: 2px 6px;
+        }
+        .search-box input {
+            background: transparent; border: none; color: #fff;
+            font-size: 12px; width: 120px; padding: 4px;
+        }
+        .search-box input:focus { outline: none; }
+        .search-box input::placeholder { color: #475569; }
+        .search-box button { padding: 4px 6px !important; font-size: 11px !important; }
+        .search-info { font-size: 11px !important; color: #64748b !important; }
+        
+        .search-dropdown {
+            position: absolute; top: 100%; left: 0; right: 0; margin-top: 4px;
+            background: #1e293b; border: 1px solid #334155; border-radius: 6px;
+            max-height: 200px; overflow-y: auto; z-index: 100; box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+        }
+        .search-dropdown-item {
+            padding: 8px 12px; cursor: pointer; font-size: 12px; color: #94a3b8;
+            border-bottom: 1px solid #334155; transition: background 0.15s;
+        }
+        .search-dropdown-item:last-child { border-bottom: none; }
+        .search-dropdown-item:hover { background: #334155; color: #f1f5f9; }
+        .search-dropdown-item mark { background: #facc15; color: #000; padding: 0 2px; border-radius: 2px; }
+        .search-dropdown-page { font-size: 10px; color: #64748b; margin-left: 8px; }
+        
+        .page-container {
+            position: relative; display: flex; justify-content: center;
+            padding: 16px; background: #0f172a; min-height: 400px; overflow: auto;
+        }
+        .page-wrapper { position: relative; box-shadow: 0 4px 16px rgba(0,0,0,0.4); }
+        .page-wrapper canvas { display: block; }
+        
+        /* Text Layer */
+        .text-layer {
+            position: absolute; left: 0; top: 0; right: 0; bottom: 0;
+            overflow: hidden; opacity: 0.2; line-height: 1.0;
+        }
+        .text-layer > span {
+            color: transparent; position: absolute; white-space: pre;
+            transform-origin: 0% 0%; cursor: text;
+        }
+        .text-layer > span::selection { background: rgba(99, 102, 241, 0.4); }
+        .text-layer .highlight { background: rgba(250, 204, 21, 0.4); border-radius: 2px; }
+        .text-layer .highlight.current { background: rgba(239, 68, 68, 0.5); }
+        
+        /* Clickable highlights */
+        .highlight-overlay {
+            position: absolute; border-radius: 2px;
+            cursor: pointer; transition: opacity 0.15s;
+        }
+        .highlight-overlay:hover { opacity: 0.7; }
+        
+        /* Note highlight line */
+        .note-highlight {
+            position: absolute; 
+            pointer-events: none;
+            border-radius: 2px;
+        }
+        
+        /* Notes */
+        .note-marker {
+            position: absolute; width: 18px; height: 18px;
+            background: #f59e0b; border-radius: 4px; border: none;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            font-size: 10px; color: #000;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3); transition: transform 0.15s;
+            z-index: 10;
+        }
+        .note-marker:hover { transform: scale(1.1); background: #fbbf24; }
+        
+        .note-popup {
+            position: absolute; width: 220px; background: #1e293b;
+            border: 1px solid #334155; border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4); z-index: 20;
+        }
+        .note-popup-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 10px; border-bottom: 1px solid #334155;
+            font-size: 11px; color: #94a3b8;
+        }
+        .note-popup-header button {
+            background: none; border: none; color: #64748b; cursor: pointer; font-size: 14px;
+        }
+        .note-popup-header button:hover { color: #f87171; }
+        .note-popup textarea {
+            width: 100%; padding: 10px; background: transparent; border: none;
+            color: #f1f5f9; font-size: 12px; font-family: inherit; resize: none; min-height: 60px;
+        }
+        .note-popup textarea:focus { outline: none; }
+        .note-popup-actions { padding: 8px 10px; border-top: 1px solid #334155; display: flex; justify-content: space-between; }
+        .note-popup-actions button {
+            padding: 4px 10px; border: none; border-radius: 4px;
+            font-size: 11px; cursor: pointer;
+        }
+        .note-popup-actions .save-btn { background: #6366f1; color: #fff; }
+        .note-popup-actions .delete-btn { background: #ef4444; color: #fff; }
+        
+        /* Context Menu */
+        .context-menu {
+            position: absolute; transform: translateX(-50%);
+            background: #1e293b; border: 1px solid #334155; border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4); z-index: 40;
+            min-width: 160px; padding: 4px;
+        }
+        .menu-item {
+            display: flex; align-items: center; gap: 8px; width: 100%;
+            padding: 8px 12px; border: none; border-radius: 4px;
+            background: transparent; color: #e2e8f0; font-size: 13px;
+            cursor: pointer; text-align: left; transition: background 0.15s;
+        }
+        .menu-item:hover { background: #334155; }
+        .menu-item-danger { color: #f87171; }
+        .menu-item-danger:hover { background: rgba(248, 113, 113, 0.15); }
+        .menu-item-close { color: #64748b; }
+        .menu-header {
+            display: flex; align-items: center; gap: 8px;
+            padding: 6px 8px; border-bottom: 1px solid #334155; margin-bottom: 4px;
+        }
+        .menu-header button {
+            background: transparent; border: none; color: #94a3b8;
+            cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 4px;
+        }
+        .menu-header button:hover { background: #334155; }
+        .menu-header span { color: #94a3b8; font-size: 12px; }
+        .color-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 8px;
+        }
+        .color-grid button {
+            width: 32px; height: 32px; border: none; border-radius: 6px;
+            cursor: pointer; transition: transform 0.15s;
+        }
+        .color-grid button:hover { transform: scale(1.1); }
+        
+        .highlight-menu {
+            position: absolute; display: flex; gap: 4px; padding: 4px 6px;
+            background: #1e293b; border: 1px solid #334155; border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4); z-index: 40;
+        }
+        .highlight-menu button {
+            padding: 4px 8px; border: none; border-radius: 4px;
+            background: #ef4444; color: #fff; font-size: 11px; cursor: pointer;
+            display: flex; align-items: center; gap: 4px;
+        }
+        .highlight-menu button:last-child {
+            background: #475569; padding: 4px 6px;
+        }
+        .highlight-menu button:hover { opacity: 0.9; }
+        
+        .reader-footer {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 6px 12px; background: #1e293b; border-top: 1px solid #334155; font-size: 11px;
+        }
+        .footer-info { color: #64748b; }
+        .credit { display: flex; align-items: center; gap: 5px; color: #64748b; text-decoration: none; }
+        .credit:hover { color: #94a3b8; }
+        .credit svg { width: 12px; height: 12px; fill: currentColor; opacity: 0.7; }
+        
+        .status { text-align: center; padding: 40px; color: #64748b; font-size: 0.85rem; }
+        .spinner {
+            width: 24px; height: 24px; border: 2px solid #334155; border-top-color: #6366f1;
+            border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 8px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        .file-badge {
+            text-align: center; padding: 6px; background: rgba(99,102,241,0.1);
+            color: #a5b4fc; font-size: 0.75rem; border-bottom: 1px solid #334155;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+    
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback } = React;
+        
+        function PdfReader({ 
+            data, 
+            name, 
+            enableSearch = false, 
+            enableHighlights = false, 
+            enableNotes = false,
+            initialHighlights = [],
+            initialNotes = [],
+            onHighlightsChange = null,
+            onNotesChange = null
+        }) {
+            const [doc, setDoc] = useState(null);
+            const [page, setPage] = useState(1);
+            const [pages, setPages] = useState(0);
+            const [loading, setLoading] = useState(true);
+            const [scale, setScale] = useState(1.2);
+            const [allTextContent, setAllTextContent] = useState([]);
+            const [searchQuery, setSearchQuery] = useState('');
+            const [searchResults, setSearchResults] = useState([]);
+            const [currentMatch, setCurrentMatch] = useState(0);
+            const [showDropdown, setShowDropdown] = useState(false);
+            const [highlights, setHighlights] = useState(initialHighlights);
+            const [notes, setNotes] = useState(initialNotes);
+            const [showHighlightToolbar, setShowHighlightToolbar] = useState(false);
+            const [selectionRect, setSelectionRect] = useState(null);
+            const [activeNote, setActiveNote] = useState(null);
+            const [noteText, setNoteText] = useState('');
+            const [activeHighlight, setActiveHighlight] = useState(null);
+            
+            const canvasRef = useRef(null);
+            const textLayerRef = useRef(null);
+            const pageWrapperRef = useRef(null);
+            const [showColorPicker, setShowColorPicker] = useState(null);
+            
+            // Use refs for callbacks to avoid re-render loops
+            const onHighlightsChangeRef = useRef(onHighlightsChange);
+            const onNotesChangeRef = useRef(onNotesChange);
+            onHighlightsChangeRef.current = onHighlightsChange;
+            onNotesChangeRef.current = onNotesChange;
+            
+            // Notify parent when highlights change (only when highlights actually change)
+            useEffect(() => {
+                if (onHighlightsChangeRef.current && highlights.length > 0) {
+                    onHighlightsChangeRef.current(highlights);
+                }
+            }, [highlights]);
+            
+            // Notify parent when notes change (only when notes actually change)
+            useEffect(() => {
+                if (onNotesChangeRef.current && notes.length > 0) {
+                    onNotesChangeRef.current(notes);
+                }
+            }, [notes]);
+            
+            // Load PDF and extract all text
+            useEffect(() => {
+                setLoading(true);
+                setPage(1);
+                setHighlights([]);
+                setNotes([]);
+                setAllTextContent([]);
+                
+                pdfjsLib.getDocument({ data }).promise.then(async (pdf) => {
+                    setDoc(pdf);
+                    setPages(pdf.numPages);
+                    
+                    // Extract text from all pages for search
+                    const allText = [];
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const p = await pdf.getPage(i);
+                        const tc = await p.getTextContent();
+                        tc.items.forEach(item => {
+                            if (item.str.trim()) {
+                                allText.push({ page: i, text: item.str, idx: allText.length });
+                            }
+                        });
+                    }
+                    setAllTextContent(allText);
+                    setLoading(false);
+                }).catch(() => setLoading(false));
+            }, [data]);
+            
+            // Render page
+            useEffect(() => {
+                if (!doc || loading) return;
+                
+                doc.getPage(page).then(async (p) => {
+                    const vp = p.getViewport({ scale });
+                    const canvas = canvasRef.current;
+                    canvas.height = vp.height;
+                    canvas.width = vp.width;
+                    await p.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+                    
+                    // Render text layer
+                    if (textLayerRef.current) {
+                        textLayerRef.current.innerHTML = '';
+                        const tc = await p.getTextContent();
+                        
+                        tc.items.forEach((item, idx) => {
+                            const tx = pdfjsLib.Util.transform(vp.transform, item.transform);
+                            const span = document.createElement('span');
+                            span.textContent = item.str;
+                            span.style.left = `${tx[4]}px`;
+                            span.style.top = `${tx[5] - item.height}px`;
+                            span.style.fontSize = `${item.height}px`;
+                            span.dataset.idx = idx;
+                            textLayerRef.current.appendChild(span);
+                        });
+                    }
+                });
+            }, [doc, page, scale, loading]);
+            
+            // Search with suggestions
+            const handleSearchInput = (value) => {
+                setSearchQuery(value);
+                if (value.length >= 2) {
+                    const query = value.toLowerCase();
+                    const results = allTextContent
+                        .filter(item => item.text.toLowerCase().includes(query))
+                        .slice(0, 10);
+                    setSearchResults(results);
+                    setShowDropdown(results.length > 0);
+                } else {
+                    setSearchResults([]);
+                    setShowDropdown(false);
+                }
+            };
+            
+            const goToResult = (result) => {
+                setPage(result.page);
+                setShowDropdown(false);
+            };
+            
+            const highlightMatch = (text, query) => {
+                const idx = text.toLowerCase().indexOf(query.toLowerCase());
+                if (idx === -1) return text;
+                return (
+                    <>
+                        {text.slice(0, idx)}
+                        <mark>{text.slice(idx, idx + query.length)}</mark>
+                        {text.slice(idx + query.length)}
+                    </>
+                );
+            };
+            
+            // Highlight selection - captures all rects for multi-line
+            const handleMouseUp = (e) => {
+                if (!enableHighlights && !enableNotes) return;
+                
+                const selection = window.getSelection();
+                if (!selection || selection.isCollapsed) {
+                    if (!e.target.closest('.context-menu') && !e.target.closest('.note-popup') && !e.target.closest('.highlight-menu')) {
+                        setShowHighlightToolbar(false);
+                        setShowColorPicker(null);
+                    }
+                    return;
+                }
+                
+                const range = selection.getRangeAt(0);
+                const rects = range.getClientRects();
+                const wrapperRect = pageWrapperRef.current?.getBoundingClientRect();
+                
+                if (wrapperRect && rects.length > 0) {
+                    // Collect all rectangles for multi-line selection
+                    const allRects = [];
+                    for (let i = 0; i < rects.length; i++) {
+                        const r = rects[i];
+                        if (r.width > 0 && r.height > 0) {
+                            allRects.push({
+                                x: r.left - wrapperRect.left,
+                                y: r.top - wrapperRect.top,
+                                width: r.width,
+                                height: r.height
+                            });
+                        }
+                    }
+                    
+                    // Use the first rect for menu positioning
+                    const firstRect = allRects[0];
+                    if (firstRect) {
+                        setSelectionRect({
+                            ...firstRect,
+                            rects: allRects,
+                            text: selection.toString()
+                        });
+                        setShowHighlightToolbar(true);
+                        setShowColorPicker(null);
+                    }
+                }
+            };
+            
+            const addHighlight = (color) => {
+                if (!selectionRect) return;
+                setHighlights(prev => [...prev, { 
+                    page, 
+                    rects: selectionRect.rects || [selectionRect],
+                    color, 
+                    id: Date.now(),
+                    text: selectionRect.text
+                }]);
+                setShowHighlightToolbar(false);
+                setShowColorPicker(null);
+                window.getSelection()?.removeAllRanges();
+            };
+            
+            const addNote = (color = 'rgba(251, 191, 36, 0.3)') => {
+                if (!selectionRect) return;
+                const newNote = {
+                    id: Date.now(),
+                    page,
+                    rects: selectionRect.rects || [selectionRect],
+                    x: selectionRect.x,
+                    y: selectionRect.y,
+                    width: selectionRect.width,
+                    height: selectionRect.height,
+                    color,
+                    text: ''
+                };
+                setNotes(prev => [...prev, newNote]);
+                setActiveNote(newNote.id);
+                setNoteText('');
+                setShowHighlightToolbar(false);
+                setShowColorPicker(null);
+                window.getSelection()?.removeAllRanges();
+            };
+            
+            const saveNote = () => {
+                setNotes(prev => prev.map(n => n.id === activeNote ? { ...n, text: noteText } : n));
+                setActiveNote(null);
+            };
+            
+            const deleteNote = (id) => {
+                setNotes(prev => prev.filter(n => n.id !== id));
+                setActiveNote(null);
+            };
+            
+            const download = () => {
+                const blob = new Blob([data], { type: 'application/pdf' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = name || 'document.pdf';
+                a.click();
+            };
+            
+            if (loading) return <div className="status"><div className="spinner"></div>Loading...</div>;
+            
+            const pageHighlights = highlights.filter(h => h.page === page);
+            const pageNotes = notes.filter(n => n.page === page);
+            
+            return (
+                <>
+                    {name && <div className="file-badge">📄 {name}</div>}
+                    
+                    <div className="reader-toolbar">
+                        <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>‹</button>
+                        <span>{page} / {pages}</span>
+                        <button onClick={() => setPage(p => Math.min(pages, p + 1))} disabled={page === pages}>›</button>
+                        <span>|</span>
+                        <button onClick={() => setScale(s => Math.max(0.5, s - 0.2))}>−</button>
+                        <span>{Math.round(scale * 100)}%</span>
+                        <button onClick={() => setScale(s => Math.min(3, s + 0.2))}>+</button>
+                        <span>|</span>
+                        <button onClick={download}>↓</button>
+                        
+                        {enableSearch && (
+                            <>
+                                <span>|</span>
+                                <div className="search-wrapper">
+                                    <div className="search-box">
+                                        <input 
+                                            type="text" 
+                                            placeholder="Search..." 
+                                            value={searchQuery}
+                                            onChange={e => handleSearchInput(e.target.value)}
+                                            onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
+                                            onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+                                        />
+                                        <button onClick={() => setShowDropdown(!showDropdown)}>🔍</button>
+                                    </div>
+                                    
+                                    {showDropdown && searchResults.length > 0 && (
+                                        <div className="search-dropdown">
+                                            {searchResults.map((result, i) => (
+                                                <div 
+                                                    key={i} 
+                                                    className="search-dropdown-item"
+                                                    onClick={() => goToResult(result)}
+                                                >
+                                                    {highlightMatch(result.text, searchQuery)}
+                                                    <span className="search-dropdown-page">Page {result.page}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </>
+                        )}
+                    </div>
+                    
+                    <div className="page-container" onClick={() => setShowDropdown(false)}>
+                        <div className="page-wrapper" ref={pageWrapperRef} onMouseUp={handleMouseUp}>
+                            <canvas ref={canvasRef} />
+                            <div className="text-layer" ref={textLayerRef}></div>
+                            
+                            {/* Note Line Highlights - render all rects */}
+                            {enableNotes && pageNotes.map(n => (
+                                n.rects ? n.rects.map((r, i) => (
+                                    <div 
+                                        key={`nh-${n.id}-${i}`}
+                                        className="note-highlight"
+                                        style={{ 
+                                            left: r.x, 
+                                            top: r.y, 
+                                            width: r.width, 
+                                            height: r.height,
+                                            background: n.color || 'rgba(251, 191, 36, 0.25)'
+                                        }}
+                                    />
+                                )) : (
+                                    <div 
+                                        key={`nh-${n.id}`}
+                                        className="note-highlight"
+                                        style={{ 
+                                            left: n.x || 0, 
+                                            top: n.y, 
+                                            width: n.width || 100, 
+                                            height: n.height || 16,
+                                            background: n.color || 'rgba(251, 191, 36, 0.25)'
+                                        }}
+                                    />
+                                )
+                            ))}
+                            
+                            {/* Clickable Highlights - render all rects for multi-line */}
+                            {pageHighlights.map(h => (
+                                h.rects ? h.rects.map((r, i) => (
+                                    <div 
+                                        key={`${h.id}-${i}`}
+                                        className="highlight-overlay"
+                                        style={{ left: r.x, top: r.y, width: r.width, height: r.height, background: h.color }}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setActiveHighlight(activeHighlight === h.id ? null : h.id);
+                                        }}
+                                        title="Click to manage"
+                                    />
+                                )) : (
+                                    <div 
+                                        key={h.id}
+                                        className="highlight-overlay"
+                                        style={{ left: h.x, top: h.y, width: h.width, height: h.height, background: h.color }}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setActiveHighlight(activeHighlight === h.id ? null : h.id);
+                                        }}
+                                        title="Click to manage"
+                                    />
+                                )
+                            ))}
+                            
+                            {/* Highlight Menu Popup */}
+                            {activeHighlight && pageHighlights.find(h => h.id === activeHighlight) && (() => {
+                                const h = pageHighlights.find(h => h.id === activeHighlight);
+                                const firstRect = h.rects ? h.rects[0] : h;
+                                return (
+                                    <div 
+                                        className="highlight-menu"
+                                        style={{ left: firstRect.x, top: firstRect.y - 30 }}
+                                    >
+                                        <button onClick={() => { setHighlights(prev => prev.filter(x => x.id !== activeHighlight)); setActiveHighlight(null); }}>
+                                            🗑️ Delete
+                                        </button>
+                                        <button onClick={() => setActiveHighlight(null)}>✕</button>
+                                    </div>
+                                );
+                            })()}
+                            
+                            {/* Note Markers */}
+                            {enableNotes && pageNotes.map(n => (
+                                <div 
+                                    key={n.id}
+                                    className="note-marker"
+                                    style={{ left: -24, top: n.y - 2, background: n.color ? n.color.replace('0.3', '1') : '#f59e0b' }}
+                                    onClick={() => { setActiveNote(n.id); setNoteText(n.text); }}
+                                    title={n.text || 'Click to edit'}
+                                >
+                                    📝
+                                </div>
+                            ))}
+                            
+                            {/* Note Popup */}
+                            {activeNote && pageNotes.find(n => n.id === activeNote) && (
+                                <div 
+                                    className="note-popup"
+                                    style={{ 
+                                        left: 30,
+                                        top: pageNotes.find(n => n.id === activeNote).y - 10
+                                    }}
+                                >
+                                    <div className="note-popup-header">
+                                        <span>📝 Note</span>
+                                        <button onClick={() => setActiveNote(null)}>×</button>
+                                    </div>
+                                    <textarea
+                                        value={noteText}
+                                        onChange={e => setNoteText(e.target.value)}
+                                        placeholder="Add your note..."
+                                        autoFocus
+                                    />
+                                    <div className="note-popup-actions">
+                                        <button className="delete-btn" onClick={() => deleteNote(activeNote)}>Delete</button>
+                                        <button className="save-btn" onClick={saveNote}>Save</button>
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {/* Context Menu */}
+                            {showHighlightToolbar && selectionRect && (
+                                <div 
+                                    className="context-menu"
+                                    style={{ top: selectionRect.y - 10, left: selectionRect.x + selectionRect.width / 2 }}
+                                >
+                                    {!showColorPicker ? (
+                                        <>
+                                            {enableHighlights && (
+                                                <button className="menu-item" onClick={() => setShowColorPicker('highlight')}>
+                                                    🖍️ Add Highlight
+                                                </button>
+                                            )}
+                                            {enableNotes && (
+                                                <button className="menu-item" onClick={() => setShowColorPicker('note')}>
+                                                    📝 Add Note
+                                                </button>
+                                            )}
+                                            {pageHighlights.length > 0 && (
+                                                <button className="menu-item menu-item-danger" onClick={() => { setHighlights(prev => prev.filter(h => h.page !== page)); setShowHighlightToolbar(false); }}>
+                                                    🗑️ Remove All Highlights
+                                                </button>
+                                            )}
+                                            <button className="menu-item menu-item-close" onClick={() => setShowHighlightToolbar(false)}>
+                                                ✕ Close
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="menu-header">
+                                                <button onClick={() => setShowColorPicker(null)}>←</button>
+                                                <span>{showColorPicker === 'highlight' ? 'Pick Color' : 'Note Color'}</span>
+                                            </div>
+                                            <div className="color-grid">
+                                                <button style={{background:'#facc15'}} onClick={() => showColorPicker === 'highlight' ? addHighlight('rgba(250, 204, 21, 0.4)') : addNote('rgba(251, 191, 36, 0.3)')} title="Yellow" />
+                                                <button style={{background:'#4ade80'}} onClick={() => showColorPicker === 'highlight' ? addHighlight('rgba(74, 222, 128, 0.4)') : addNote('rgba(52, 211, 153, 0.3)')} title="Green" />
+                                                <button style={{background:'#60a5fa'}} onClick={() => showColorPicker === 'highlight' ? addHighlight('rgba(96, 165, 250, 0.4)') : addNote('rgba(96, 165, 250, 0.3)')} title="Blue" />
+                                                <button style={{background:'#f472b6'}} onClick={() => showColorPicker === 'highlight' ? addHighlight('rgba(244, 114, 182, 0.4)') : addNote('rgba(244, 114, 182, 0.3)')} title="Pink" />
+                                                <button style={{background:'#a78bfa'}} onClick={() => showColorPicker === 'highlight' ? addHighlight('rgba(167, 139, 250, 0.4)') : addNote('rgba(167, 139, 250, 0.3)')} title="Purple" />
+                                                <button style={{background:'#f87171'}} onClick={() => showColorPicker === 'highlight' ? addHighlight('rgba(248, 113, 113, 0.4)') : addNote('rgba(248, 113, 113, 0.3)')} title="Red" />
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    
+                    <div className="reader-footer">
+                        <span className="footer-info">
+                            {highlights.length > 0 && `${highlights.length} highlight${highlights.length > 1 ? 's' : ''} (click to delete)`}
+                            {highlights.length > 0 && notes.length > 0 && ' • '}
+                            {notes.length > 0 && `${notes.length} note${notes.length > 1 ? 's' : ''}`}
+                        </span>
+                        <a href="https://github.com/codeninja-404" target="_blank" rel="noopener" className="credit">
+                            <svg viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                            Codeninja-404
+                        </a>
+                    </div>
+                </>
+            );
+        }
+        
+        function App() {
+            const [data, setData] = useState(null);
+            const [name, setName] = useState('');
+            const [url, setUrl] = useState('');
+            const [loading, setLoading] = useState(false);
+            const [enableSearch, setEnableSearch] = useState(true);
+            const [enableHighlights, setEnableHighlights] = useState(true);
+            const [enableNotes, setEnableNotes] = useState(true);
+            const [savedHighlights, setSavedHighlights] = useState([]);
+            const [savedNotes, setSavedNotes] = useState([]);
+            
+            // Handle annotations changes - can save to localStorage/API here
+            const handleHighlightsChange = (newHighlights) => {
+                setSavedHighlights(newHighlights);
+                console.log('Highlights updated:', newHighlights);
+                // You can save to localStorage or API here
+            };
+            
+            const handleNotesChange = (newNotes) => {
+                setSavedNotes(newNotes);
+                console.log('Notes updated:', newNotes);
+                // You can save to localStorage or API here
+            };
+            
+            const loadFile = file => {
+                if (!file?.type?.includes('pdf')) return;
+                setName(file.name);
+                setSavedHighlights([]); // Reset for new file
+                setSavedNotes([]);
+                const r = new FileReader();
+                r.onload = e => setData(new Uint8Array(e.target.result));
+                r.readAsArrayBuffer(file);
+            };
+            
+            const loadUrl = async e => {
+                e.preventDefault();
+                if (!url.trim()) return;
+                setLoading(true);
+                setSavedHighlights([]); // Reset for new URL
+                setSavedNotes([]);
+                try {
+                    const res = await fetch(url);
+                    const buf = await res.arrayBuffer();
+                    setData(new Uint8Array(buf));
+                    setName(url.split('/').pop());
+                } catch {}
+                setLoading(false);
+            };
+            
+            return (
+                <div className="container">
+                    <div className="header">
+                        <h1><span>🦀</span>Rusty PDF</h1>
+                        <p>PDF Viewer with Search, Highlights & Notes</p>
+                    </div>
+                    
+                    <div className="controls">
+                        <div 
+                            className="upload-area"
+                            onClick={() => document.getElementById('file').click()}
+                            onDragOver={e => e.preventDefault()}
+                            onDrop={e => { e.preventDefault(); loadFile(e.dataTransfer.files[0]); }}
+                        >
+                            <div className="icon">📄</div>
+                            <div className="text">Drop PDF or click to upload</div>
+                            <input type="file" id="file" className="file-input" accept=".pdf" onChange={e => loadFile(e.target.files[0])} />
+                        </div>
+                        
+                        <div className="divider">or URL</div>
+                        
+                        <form className="url-row" onSubmit={loadUrl}>
+                            <input type="url" className="url-input" placeholder="https://..." value={url} onChange={e => setUrl(e.target.value)} />
+                            <button type="submit" className="btn" disabled={!url.trim() || loading}>{loading ? '...' : 'Load'}</button>
+                        </form>
+                    </div>
+                    
+                    <div className="options-row">
+                        <label className="option-label">
+                            <input type="checkbox" checked={enableSearch} onChange={e => setEnableSearch(e.target.checked)} />
+                            🔍 Search
+                        </label>
+                        <label className="option-label">
+                            <input type="checkbox" checked={enableHighlights} onChange={e => setEnableHighlights(e.target.checked)} />
+                            🖍️ Highlights
+                        </label>
+                        <label className="option-label">
+                            <input type="checkbox" checked={enableNotes} onChange={e => setEnableNotes(e.target.checked)} />
+                            📝 Notes
+                        </label>
+                    </div>
+                    
+                    <div className="reader">
+                        {data ? (
+                            <PdfReader 
+                                data={data} 
+                                name={name}
+                                enableSearch={enableSearch}
+                                enableHighlights={enableHighlights}
+                                enableNotes={enableNotes}
+                                initialHighlights={savedHighlights}
+                                initialNotes={savedNotes}
+                                onHighlightsChange={handleHighlightsChange}
+                                onNotesChange={handleNotesChange}
+                            />
+                        ) : (
+                            <div className="status">Upload a PDF to view</div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+        
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>

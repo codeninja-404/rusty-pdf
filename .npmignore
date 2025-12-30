@@ -1,0 +1,15 @@
+# Source files
+src/
+js/
+pkg/
+target/
+
+# Dev files
+demo.html
+Cargo.*
+*.toml
+.babelrc
+.git*
+
+# Dependencies
+node_modules/

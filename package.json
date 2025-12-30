@@ -1,6 +1,6 @@
 {
   "name": "rusty-pdf",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "type": "module",
   "description": "A React PDF reader powered by Rust/WASM with theming support",
   "main": "dist/index.js",

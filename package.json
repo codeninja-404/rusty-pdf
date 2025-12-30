@@ -1,6 +1,6 @@
 {
   "name": "rusty-pdf",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "type": "module",
   "description": "A React PDF reader powered by Rust/WASM with theming support",
   "main": "dist/index.js",
@@ -12,13 +12,13 @@
       "import": "./dist/index.mjs",
       "require": "./dist/index.js"
     },
-    "./styles.css": "./dist/style.css"
+    "./styles.css": "./dist/rusty-pdf.css"
   },
   "scripts": {
     "dev": "vite",
     "build:wasm": "wasm-pack build --target web --out-dir src/wasm",
     "build:js": "vite build",
-    "build": "npm run build:wasm && npm run build:js",
+    "build": "npm run build:wasm && npm run build:js && mkdir -p dist/wasm && cp src/wasm/rusty_pdf_bg.wasm src/wasm/rusty_pdf.js dist/wasm/",
     "prepublishOnly": "npm run build"
   },
   "keywords": [

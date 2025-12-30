@@ -1,15 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import * as React from 'react';
 import init, { PdfEngine } from './rusty_pdf.js';
 import './styles.css';
 
 const RustyPdf = ({ url, theme = 'system' }) => {
-  const [engine, setEngine] = useState(null);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const canvasRef = useRef(null);
+  const [engine, setEngine] = React.useState(null);
+  const [page, setPage] = React.useState(1);
+  const [totalPages, setTotalPages] = React.useState(0);
+  const [loading, setLoading] = React.useState(true);
+  const canvasRef = React.useRef(null);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const start = async () => {
       await init();
       try {
@@ -24,7 +24,7 @@ const RustyPdf = ({ url, theme = 'system' }) => {
     start();
   }, [url]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (engine && !loading) {
       engine.render_page_to_canvas(page, 'pdf-canvas');
     }

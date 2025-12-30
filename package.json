@@ -1,0 +1,51 @@
+{
+  "name": "rusty-pdf",
+  "version": "1.0.1",
+  "description": "A React PDF reader powered by Rust/WASM with theming support",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/rusty_pdf.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/rusty_pdf.d.ts"
+    },
+    "./styles.css": "./dist/styles.css"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "dev": "npx serve -p 3000",
+    "build:wasm": "wasm-pack build --target web",
+    "build": "npm run build:wasm && babel js -d dist --copy-files && cp pkg/rusty_pdf.js pkg/rusty_pdf.d.ts pkg/rusty_pdf_bg.wasm pkg/rusty_pdf_bg.wasm.d.ts dist/",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "pdf",
+    "react",
+    "wasm",
+    "rust",
+    "pdf-viewer",
+    "webassembly"
+  ],
+  "author": "codeninja-404",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/codeninja-404/rusty-pdf.git"
+  },
+  "homepage": "https://github.com/codeninja-404/rusty-pdf#readme",
+  "bugs": {
+    "url": "https://github.com/codeninja-404/rusty-pdf/issues"
+  },
+  "peerDependencies": {
+    "react": ">=16.8.0"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.0.0",
+    "@babel/core": "^7.0.0",
+    "@babel/preset-react": "^7.0.0"
+  }
+}
